@@ -2,6 +2,7 @@ package com.example.demo.util;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
@@ -9,8 +10,10 @@ import java.util.Date;
 
 @Component
 public class JwtUtil {
-    private final String SECRET_KEY = "$2a$08$CQQ8HWOzFwTWgYtgYSeS/u57HPVc5caagBUO/WD3HeK6drzWz0FnK";
-    private final long EXPIRATION_TIME = 86400000; // 24 hours
+    @Value("${jwt.secret}")
+    private String SECRET_KEY;
+    @Value("${jwt.expiration}")
+    private long EXPIRATION_TIME;
 
     public String generateToken(Authentication authentication) {
         String username = authentication.getName();

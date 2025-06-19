@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+
 import com.example.demo.exception.UnauthorizedException;
 import com.example.demo.model.entity.User;
 import com.example.demo.repository.UserRepository;
@@ -9,11 +10,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.logging.Logger;
 
 @Service
@@ -28,32 +28,23 @@ public class AuthService {
     private UserRepository userRepository;
 
     @Autowired
-    private JwtUtil jwtService;
+    private JwtUtil jwtUtil;
 
     @Autowired
-    private PasswordEncoder securityPasswordEncoder;
+    private PasswordEncoder passwordEncoder;
 
     public String authenticate(String username, String password) {
         logger.info("Attempting authentication for user: " + username);
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> {
-                    logger.warning("User not found: " + username);
-                    return new UnauthorizedException("Invalid username or password");
-                });
         try {
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            username,
-                            password,
-                            Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name()))
-                    )
+                    new UsernamePasswordAuthenticationToken(username, password)
             );
             logger.info("Authentication successful for user: " + username);
-            return jwtService.generateToken(authentication);
+            return jwtUtil.generateToken(authentication);
         } catch (BadCredentialsException e) {
-            logger.warning("Invalid password for user: " + username);
+            logger.warning("Invalid credentials for user: " + username);
             throw new UnauthorizedException("Invalid username or password");
-        } catch (Exception e) {
+        } catch (AuthenticationException e) {
             logger.severe("Authentication error for user: " + username + " - " + e.getMessage());
             throw new UnauthorizedException("Authentication failed: " + e.getMessage());
         }
@@ -74,7 +65,7 @@ public class AuthService {
         }
         User user = new User();
         user.setUsername(username);
-        user.setPassword(securityPasswordEncoder.encode(password));
+        user.setPassword(passwordEncoder.encode(password)); // Encodes with {bcrypt}
         user.setRole(userRole);
         userRepository.save(user);
         logger.info("User registered: " + username);
@@ -82,9 +73,9 @@ public class AuthService {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 username,
                 null,
-                Collections.singletonList(new SimpleGrantedAuthority(role))
+                user.getAuthorities()
         );
-        String token = jwtService.generateToken(authentication);
+        String token = jwtUtil.generateToken(authentication);
         logger.info("Token generated for user: " + username);
         return token;
     }
