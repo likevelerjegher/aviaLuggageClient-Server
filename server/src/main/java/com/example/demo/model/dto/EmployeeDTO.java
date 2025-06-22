@@ -3,9 +3,7 @@ package com.example.demo.model.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public class UserDTO {
-
-    private Long id;
+public class EmployeeDTO {
 
     @NotBlank(message = "Username cannot be blank")
     private String username;
@@ -17,14 +15,6 @@ public class UserDTO {
     private String role;
 
     // Getters and setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getUsername() {
         return username;
     }

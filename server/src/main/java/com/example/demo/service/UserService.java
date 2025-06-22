@@ -1,10 +1,10 @@
 package com.example.demo.service;
 
 import com.example.demo.model.dto.UserDTO;
+import com.example.demo.exception.UnauthorizedException;
 import com.example.demo.model.entity.User;
 import com.example.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -19,73 +19,86 @@ public class UserService {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder securityPasswordEncoder;
+    private PasswordEncoder passwordEncoder;
 
-    @PreAuthorize("hasAuthority('ADMIN')")
     public UserDTO createEmployee(UserDTO userDTO) {
-        if (userRepository.existsByUsername(userDTO.getUsername())) {
-            throw new RuntimeException("Username already exists");
+        if (userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
+            throw new UnauthorizedException("Username already exists");
         }
-        if (userDTO.getRole() != User.Role.EMPLOYEE) {
-            throw new RuntimeException("Only EMPLOYEE role can be assigned");
+        User.Role userRole;
+        try {
+            userRole = User.Role.valueOf(userDTO.getRole());
+            if (userRole != User.Role.EMPLOYEE) {
+                throw new UnauthorizedException("Only EMPLOYEE role is allowed");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Invalid role: " + userDTO.getRole());
         }
-
         User user = new User();
         user.setUsername(userDTO.getUsername());
-        user.setPassword(securityPasswordEncoder.encode(userDTO.getPassword()));
-        user.setRole(userDTO.getRole());
+        user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
+        user.setRole(userRole);
         user.setCreatedAt(LocalDateTime.now());
+        user = userRepository.save(user);
 
-        User savedUser = userRepository.save(user);
-        return mapToDTO(savedUser);
+        UserDTO responseDTO = new UserDTO();
+        responseDTO.setId(user.getId());
+        responseDTO.setUsername(user.getUsername());
+        responseDTO.setRole(user.getRole().name());
+        return responseDTO;
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
     public List<UserDTO> getAllEmployees() {
         return userRepository.findAll().stream()
                 .filter(user -> user.getRole() == User.Role.EMPLOYEE)
-                .map(this::mapToDTO)
+                .map(user -> {
+                    UserDTO dto = new UserDTO();
+                    dto.setId(user.getId());
+                    dto.setUsername(user.getUsername());
+                    dto.setRole(user.getRole().name());
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
     public void deleteEmployee(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found");
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+        if (user.getRole() != User.Role.EMPLOYEE) {
+            throw new UnauthorizedException("Only EMPLOYEE users can be deleted");
         }
-        userRepository.deleteById(id);
+        userRepository.delete(user);
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
     public UserDTO updateEmployee(Long id, UserDTO userDTO) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        if (!user.getRole().equals(User.Role.EMPLOYEE)) {
-            throw new RuntimeException("Can only update EMPLOYEE users");
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+        if (user.getRole() != User.Role.EMPLOYEE) {
+            throw new UnauthorizedException("Only EMPLOYEE users can be updated");
         }
-        if (userDTO.getUsername() != null && !userDTO.getUsername().equals(user.getUsername())) {
-            if (userRepository.existsByUsername(userDTO.getUsername())) {
-                throw new RuntimeException("Username already exists");
+        if (!user.getUsername().equals(userDTO.getUsername()) &&
+                userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
+            throw new UnauthorizedException("Username already exists");
+        }
+        try {
+            User.Role userRole = User.Role.valueOf(userDTO.getRole());
+            if (userRole != User.Role.EMPLOYEE) {
+                throw new UnauthorizedException("Only EMPLOYEE role is allowed");
             }
-            user.setUsername(userDTO.getUsername());
+            user.setRole(userRole);
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Invalid role: " + userDTO.getRole());
         }
-        if (userDTO.getPassword() != null) {
-            user.setPassword(securityPasswordEncoder.encode(userDTO.getPassword()));
+        user.setUsername(userDTO.getUsername());
+        if (userDTO.getPassword() != null && !userDTO.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         }
-        if (userDTO.getRole() != null && userDTO.getRole() == User.Role.EMPLOYEE) {
-            user.setRole(userDTO.getRole());
-        }
+        user = userRepository.save(user);
 
-        User updatedUser = userRepository.save(user);
-        return mapToDTO(updatedUser);
-    }
-
-    private UserDTO mapToDTO(User user) {
-        UserDTO dto = new UserDTO();
-        dto.setId(user.getId());
-        dto.setUsername(user.getUsername());
-        dto.setRole(user.getRole());
-        return dto;
+        UserDTO responseDTO = new UserDTO();
+        responseDTO.setId(user.getId());
+        responseDTO.setUsername(user.getUsername());
+        responseDTO.setRole(user.getRole().name());
+        return responseDTO;
     }
 }

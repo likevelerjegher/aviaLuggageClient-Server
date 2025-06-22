@@ -5,6 +5,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
@@ -21,13 +23,16 @@ public class User implements UserDetails {
     private LocalDateTime createdAt;
 
     @Column(unique = true, nullable = false)
+    @NotBlank(message = "Username cannot be blank")
     private String username;
 
     @Column(nullable = false)
+    @NotBlank(message = "Password cannot be blank")
     private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @NotNull(message = "Role cannot be null")
     private Role role;
 
     public enum Role {
