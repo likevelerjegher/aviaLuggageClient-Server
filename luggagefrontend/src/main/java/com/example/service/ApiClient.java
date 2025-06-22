@@ -1,5 +1,6 @@
 package com.example.service;
 
+import com.example.model.UserDTO;
 import com.example.model.Auth;
 import com.example.model.Baggage;
 import com.example.model.Flight;
@@ -11,9 +12,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 @Service
 public class ApiClient {
+    private static final Logger logger = Logger.getLogger(ApiClient.class.getName());
     private final WebClient webClient;
     private String token;
 
@@ -23,7 +26,60 @@ public class ApiClient {
                 .build();
     }
 
+    public List<UserDTO> getAllEmployees() {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching employees with token: " + (token != null ? "Present" : "Null"));
+            return webClient.get()
+                    .uri("/api/users/employees")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToFlux(UserDTO.class)
+                    .collectList()
+                    .block();
+        });
+    }
+
+    public UserDTO createEmployee(UserDTO user) {
+        return executeWithTokenCheck(() -> {
+            logger.info("Creating employee with token: " + (token != null ? "Present" : "Null"));
+            return webClient.post()
+                    .uri("/api/users/employee")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .bodyValue(user)
+                    .retrieve()
+                    .bodyToMono(UserDTO.class)
+                    .block();
+        });
+    }
+
+    public void deleteEmployee(Long id) {
+        executeWithTokenCheck(() -> {
+            logger.info("Deleting employee ID " + id + " with token: " + (token != null ? "Present" : "Null"));
+            webClient.delete()
+                    .uri("/api/users/employee/{id}", id)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(Void.class)
+                    .block();
+            return null;
+        });
+    }
+
+    public UserDTO updateEmployee(Long id, UserDTO user) {
+        return executeWithTokenCheck(() -> {
+            logger.info("Updating employee ID " + id + " with token: " + (token != null ? "Present" : "Null"));
+            return webClient.put()
+                    .uri("/api/users/employee/{id}", id)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .bodyValue(user)
+                    .retrieve()
+                    .bodyToMono(UserDTO.class)
+                    .block();
+        });
+    }
+
     public String login(String username, String password) {
+        logger.info("Attempting login for username: " + username);
         Auth authRequest = new Auth();
         authRequest.setUsername(username);
         authRequest.setPassword(password);
@@ -35,17 +91,23 @@ public class ApiClient {
                     .bodyToMono(Auth.class)
                     .block();
             this.token = response.getToken();
+            logger.info("Login successful, token: " + (token != null ? token.substring(0, Math.min(token.length(), 10)) + "..." : "Null"));
             return token;
         } catch (WebClientResponseException e) {
+            logger.severe("Login failed with status: " + e.getStatusCode() + ", message: " + e.getMessage());
             throw new RuntimeException("Login failed: " + e.getStatusCode());
+        } catch (Exception e) {
+            logger.severe("Unexpected login error: " + e.getMessage());
+            throw new RuntimeException("Unexpected login error: " + e.getMessage());
         }
     }
 
     public String register(String username, String password) {
-        Auth authRequest = new Auth();
-        authRequest.setUsername(username);
-        authRequest.setPassword(password);
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Attempting registration for username: " + username);
+            Auth authRequest = new Auth();
+            authRequest.setUsername(username);
+            authRequest.setPassword(password);
             Auth response = webClient.post()
                     .uri("/api/auth/register")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -53,14 +115,14 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Auth.class)
                     .block();
+            logger.info("Registration successful for username: " + username);
             return response.getToken();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Registration failed: " + e.getStatusCode());
-        }
+        });
     }
 
     public List<Baggage> getAllBaggage() {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching baggage with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/baggage")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -68,13 +130,12 @@ public class ApiClient {
                     .bodyToFlux(Baggage.class)
                     .collectList()
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get baggage: " + e.getStatusCode());
-        }
+        });
     }
 
     public Baggage createBaggage(Baggage baggage) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Creating baggage with token: " + (token != null ? "Present" : "Null"));
             return webClient.post()
                     .uri("/api/baggage")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -82,13 +143,12 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Baggage.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to create baggage: " + e.getStatusCode());
-        }
+        });
     }
 
     public Baggage updateBaggageStatus(Long id, String status) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Updating baggage status ID " + id + " with token: " + (token != null ? "Present" : "Null"));
             return webClient.put()
                     .uri(uriBuilder -> uriBuilder.path("/api/baggage/{id}/status")
                             .queryParam("status", status).build(id))
@@ -96,13 +156,12 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Baggage.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to update baggage status: " + e.getStatusCode());
-        }
+        });
     }
 
     public List<Baggage> getBaggageByPassenger(Long passengerId) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching baggage for passenger ID " + passengerId + " with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/baggage/passenger/{passengerId}", passengerId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -110,13 +169,12 @@ public class ApiClient {
                     .bodyToFlux(Baggage.class)
                     .collectList()
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get baggage by passenger: " + e.getStatusCode());
-        }
+        });
     }
 
     public List<Flight> getAllFlights() {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching flights with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/flights")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -124,13 +182,12 @@ public class ApiClient {
                     .bodyToFlux(Flight.class)
                     .collectList()
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get flights: " + e.getStatusCode());
-        }
+        });
     }
 
     public Flight createFlight(Flight flight) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Creating flight with token: " + (token != null ? "Present" : "Null"));
             return webClient.post()
                     .uri("/api/flights")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -138,13 +195,12 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Flight.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to create flight: " + e.getStatusCode());
-        }
+        });
     }
 
     public List<Passenger> getAllPassengers() {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching passengers with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/passengers")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -152,13 +208,12 @@ public class ApiClient {
                     .bodyToFlux(Passenger.class)
                     .collectList()
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get passengers: " + e.getStatusCode());
-        }
+        });
     }
 
     public Passenger createPassenger(Passenger passenger) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Creating passenger with token: " + (token != null ? "Present" : "Null"));
             return webClient.post()
                     .uri("/api/passengers")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -166,13 +221,12 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Passenger.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to create passenger: " + e.getStatusCode());
-        }
+        });
     }
 
     public Auth createUserForPassenger(Long id, Auth authRequest) {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Creating user for passenger ID " + id + " with token: " + (token != null ? "Present" : "Null"));
             return webClient.post()
                     .uri("/api/passengers/{id}/user", id)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -180,13 +234,12 @@ public class ApiClient {
                     .retrieve()
                     .bodyToMono(Auth.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to create user for passenger: " + e.getStatusCode());
-        }
+        });
     }
 
     public List<Baggage> getLostBaggageReport() {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching lost baggage report with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/reports/lost-baggage")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -194,21 +247,44 @@ public class ApiClient {
                     .bodyToFlux(Baggage.class)
                     .collectList()
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get lost baggage report: " + e.getStatusCode());
-        }
+        });
     }
 
     public String getBaggageStatistics() {
-        try {
+        return executeWithTokenCheck(() -> {
+            logger.info("Fetching baggage statistics with token: " + (token != null ? "Present" : "Null"));
             return webClient.get()
                     .uri("/api/reports/baggage-statistics")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Failed to get baggage statistics: " + e.getStatusCode());
+        });
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    private <T> T executeWithTokenCheck(Supplier<T> apiCall) {
+        if (token == null || token.isEmpty()) {
+            logger.warning("No valid token, cannot execute API call");
+            throw new RuntimeException("Please log in to continue");
         }
+        try {
+            return apiCall.get();
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode().is4xxClientError() && e.getStatusCode().value() == 401) {
+                logger.severe("401 Unauthorized, token may be expired or invalid");
+                throw new RuntimeException("Session expired, please log in again");
+            }
+            logger.severe("API call failed: " + e.getStatusCode() + ", message: " + e.getMessage());
+            throw new RuntimeException("API call failed: " + e.getStatusCode());
+        }
+    }
+
+    @FunctionalInterface
+    private interface Supplier<T> {
+        T get();
     }
 }

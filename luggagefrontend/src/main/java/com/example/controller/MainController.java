@@ -1,11 +1,13 @@
 package com.example.controller;
+
 import com.example.service.ApiClient;
-import com.example.view.BaggageView;
-import com.example.view.FlightView;
-import com.example.view.PassengerView;
-import com.example.view.ReportView;
+import com.example.view.*;
+
+import javax.swing.*;
+import java.util.logging.Logger;
 
 public class MainController {
+    private static final Logger logger = Logger.getLogger(MainController.class.getName());
     private final ApiClient apiClient;
 
     public MainController(ApiClient apiClient) {
@@ -13,22 +15,32 @@ public class MainController {
     }
 
     public void handleBaggageView() {
-        BaggageView view = new BaggageView(new BaggageController(apiClient));
-        view.setVisible(true);
+        logger.info("Opening Baggage View");
+        new BaggageView(new BaggageController(apiClient)).setVisible(true);
     }
 
     public void handleFlightView() {
-        FlightView view = new FlightView(new FlightController(apiClient));
-        view.setVisible(true);
+        logger.info("Opening Flight View");
+        new FlightView(new FlightController(apiClient)).setVisible(true);
     }
 
     public void handlePassengerView() {
-        PassengerView view = new PassengerView(new PassengerController(apiClient));
-        view.setVisible(true);
+        logger.info("Opening Passenger View, token: " + (apiClient.getToken() != null ? "Present" : "Null"));
+        if (apiClient.getToken() == null || apiClient.getToken().isEmpty()) {
+            logger.warning("No valid token, redirecting to login");
+            JOptionPane.showMessageDialog(null, "Please log in as admin", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        new PassengerView(new PassengerController(apiClient)).setVisible(true);
     }
 
     public void handleReportView() {
-        ReportView view = new ReportView(new ReportController(apiClient));
-        view.setVisible(true);
+        logger.info("Opening Report View");
+        new ReportView(new ReportController(apiClient)).setVisible(true);
+    }
+
+    public void handleEmployeeView() {
+        logger.info("Opening Employee View");
+        new EmployeeView(new EmployeeController(apiClient)).setVisible(true);
     }
 }
